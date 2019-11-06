@@ -1,19 +1,18 @@
 args <- commandArgs(trailingOnly = TRUE)
 if(length(args)!=1){
-  message("\nError!\nusage: Rscript get_xclone_input.R get_xclone_input_configure.R\n")
+  warning("\n[USAGE] Rscript get_xclone_input.R get_xclone_input_configure.R\n")
   quit()
 }
 
 configure_file <- args[1]
-configure_file <- "get_xclone_input_configure.R"
 
+library( tidyr )
 library( data.table )
 library( parallel )
 
-source(configure_file)
+source( configure_file )
 
-## RUN
-setwd(outdir)
+setwd( outdir )
 
 GetAnnotedSNPs <- function(i,single_cells_cn,haplotype_blocks,phased_snps){
   bed_file <- single_cells_cn[i]
@@ -25,28 +24,23 @@ GetAnnotedSNPs <- function(i,single_cells_cn,haplotype_blocks,phased_snps){
   cmd <- paste('intersectBed -a',haplotype_blocks,'-b',bed_file,'-wa -wb >',step4)
   system(cmd)
   
-  m <- read.delim(file = step4,header = FALSE,as.is = TRUE,stringsAsFactors = FALSE)
-  m <- m[,1:7]
-  m$haploblock <- paste(m[,1],m[,2],m[,3],sep = ":")
+  m <- fread(file = step4,sep = "\t",header = FALSE, stringsAsFactors = FALSE, data.table = FALSE,select = c(1:7))
+  m[,7] <- round(m[,7])
+  m <- unite(m,col = haploblock,seq(1,3),sep = ":",remove=FALSE)
   
-  hb <- unique(m$haploblock)
+  hb_to_exclude <- c(which(duplicated(m$haploblock,fromLast = FALSE)),which(duplicated(m$haploblock,fromLast = TRUE)))
   
-  hb_to_exclude <- c()
-  tab <- c()
-  for(x in hb){
-    check <- length(unique(m[which(m$haploblock == x),7]))
-    if( check > 1 ){
-      hb_to_exclude <- c(hb_to_exclude, x)
-    } else {
-      tab <- rbind(tab, unique(m[which(m$haploblock == x),c(1:3,7)]))
-    }
+  message(paste("removing",length(unique(m[hb_to_exclude,1])),"haplotype blocks out of",length(unique(m[,1]))))
+  
+  if(length(hb_to_exclude)>0){
+    tab <- m[-hb_to_exclude,]
+  } else {
+    tab <- m
   }
-  
-  length(hb_to_exclude)/length(hb) # fraction of hb with multiple spanning CNs 
   
   # step 5 : write haplo type blocks with associated copy number
   step5 <- paste0('step5_',CELL_ID,'.bed')
-  write.table(tab,file = step5,col.names = FALSE,row.names = FALSE,quote = FALSE,sep = "\t")
+  write.table(tab[,c(2:4,8)],file = step5,col.names = FALSE,row.names = FALSE,quote = FALSE,sep = "\t")
   
   # step 7 : add phased SNPs to each block
   step7 <- paste0('step7_',CELL_ID,'.bed')
@@ -54,13 +48,10 @@ GetAnnotedSNPs <- function(i,single_cells_cn,haplotype_blocks,phased_snps){
   system(cmd)
   file.remove(step4,step5)
   
-  # step 8 : reduce table columns and wrinte final output
+  # step 8 : reduce table columns and write the final output
   step8 <- paste0('step8_',CELL_ID,'.bed')
-  cmd <- paste('cut -f 1-6,8,9,14',step7,'>',step8)
-  system(cmd)
-  file.remove(step7)
-  
-  m <- fread(file = step8,data.table = FALSE)
+
+  m <- fread(file = step7,sep = "\t",header = FALSE, stringsAsFactors = FALSE, data.table = FALSE,select = c(1:6,8,9,14))
   header <- c("HB_CHROM","HB_START","HB_END","COPY_NUMBER","SNP_CHROM","SNP_POS","SNP_REF","SNP_ALT","SNP_PHASE_INFO")
   colnames(m) <- header
   
@@ -73,6 +64,10 @@ GetAnnotedSNPs <- function(i,single_cells_cn,haplotype_blocks,phased_snps){
   m <- m[,c("SNP_CHROM","SNP_POS","SNP_REF","SNP_ALT","SNP_PHASE_INFO","HB_CHROM","HB_START","HB_END","COPY_NUMBER")]
   write.table(m,file = step8,col.names = TRUE,row.names = FALSE,quote = FALSE,sep = "\t")
   
+  file.remove(step7)
+  
 }
 
 mclapply(seq(single_cells_cn),GetAnnotedSNPs,single_cells_cn=single_cells_cn,haplotype_blocks=haplotype_blocks,phased_snps=phased_snps,mc.cores = mc.cores)
+
+message("alright, alright, alright.")
