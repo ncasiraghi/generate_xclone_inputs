@@ -1,10 +1,31 @@
 args <- commandArgs(trailingOnly = TRUE)
-if(length(args)!=1){
-  warning("\n[USAGE] Rscript get_xclone_input.R get_xclone_input_configure.R\n")
+if(length(args)!=5){
+  message("\n[USAGE] Rscript get_xclone_input.R [single_cells_cn] [haplotype_blocks] [phased_snps] [outdir] [mc.cores]\n")
+  message("[1] single_cells_cn \tA txt file listing path to each copy number profiles for each cell or each sample (bulk data); 4 cols: chr, start, end, cn. No header.")
+  message("[2] haplotype_blocks\tBED-like file with genomic coordinates of haplotype blocks; 3 cols: chr, start, end. No header.")
+  message("[3] phased_snps     \tVCF file with only phased SNPs; VCF format.")
+  message("[4] outdir          \tFull path to the output folder.")
+  message("[5] mc.cores        \tNumber of cells (or samples) to run in parallel.\n")
   quit()
 }
 
-configure_file <- args[1]
+# txt file listing path to each copy number profiles for each cell or each sample (bulk data); 4 cols: chr, start, end, cn. No header. 
+single_cells_cn <- readLines(args[1])
+
+# BED-like file with genomic coordinates of haplotype blocks; 3 cols: chr, start, end. No header.
+haplotype_blocks <- args[2]
+
+# VCF file with only phased SNPs; VCF format
+phased_snps <- args[3]
+
+# output folder
+outdir <- args[4]
+
+# number of cells (or samples) to run in parallel
+mc.cores <- as.numeric(args[5])
+
+
+
 
 library( tidyr )
 library( data.table )
