@@ -9,29 +9,15 @@ if(length(args)!=5){
   quit()
 }
 
-# txt file listing path to each copy number profiles for each cell or each sample (bulk data); 4 cols: chr, start, end, cn. No header. 
 single_cells_cn <- readLines(args[1])
-
-# BED-like file with genomic coordinates of haplotype blocks; 3 cols: chr, start, end. No header.
 haplotype_blocks <- args[2]
-
-# VCF file with only phased SNPs; VCF format
 phased_snps <- args[3]
-
-# output folder
 outdir <- args[4]
-
-# number of cells (or samples) to run in parallel
 mc.cores <- as.numeric(args[5])
-
-
-
 
 library( tidyr )
 library( data.table )
 library( parallel )
-
-source( configure_file )
 
 setwd( outdir )
 
