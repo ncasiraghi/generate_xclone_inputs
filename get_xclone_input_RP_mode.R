@@ -1,7 +1,7 @@
 args <- commandArgs(trailingOnly = TRUE)
 if(length(args)!=5){
-  message("\n[USAGE] Rscript get_xclone_input.R [single_cells_cn] [haplotype_blocks] [phased_snps] [outdir] [mc.cores]\n")
-  message("[1] single_cells_cn \tA txt file listing path to each copy number profiles for each cell or each sample (bulk data); 4 cols: chr, start, end, cn. No header.")
+  message("\n[USAGE] Rscript get_xclone_input_RP_mode.R [single_cells_cn] [haplotype_blocks] [phased_snps] [outdir] [mc.cores]\n")
+  message("[1] single_cells_cn \tA txt file listing the full path to each copy number profiles for each cell or each sample (bulk data); 4 cols: chr, start, end, cn. No header.")
   message("[2] haplotype_blocks\tBED-like file with genomic coordinates of haplotype blocks; 3 cols: chr, start, end. No header.")
   message("[3] phased_snps     \tVCF file with only phased SNPs; VCF format.")
   message("[4] outdir          \tFull path to the output folder.")
@@ -20,7 +20,6 @@ library( data.table )
 library( parallel )
 
 setwd( outdir )
-
 GetAnnotedSNPs <- function(i,single_cells_cn,haplotype_blocks,phased_snps){
   bed_file <- single_cells_cn[i]
   message(basename(bed_file))
@@ -75,6 +74,6 @@ GetAnnotedSNPs <- function(i,single_cells_cn,haplotype_blocks,phased_snps){
   
 }
 
+message("running in mode: Read Phasing")
 mclapply(seq(single_cells_cn),GetAnnotedSNPs,single_cells_cn=single_cells_cn,haplotype_blocks=haplotype_blocks,phased_snps=phased_snps,mc.cores = mc.cores)
-
-message("alright, alright, alright.")
+message("done.")
