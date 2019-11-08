@@ -22,9 +22,75 @@ library( parallel )
 setwd( outdir )
 
 if(genes=="NA"){
-  message("running in mode: Statistical Phasing & unit: cn_blocks")
   ## unit: cn_blocks 
-  quit()
+  message("running in mode: Statistical Phasing & unit: cn_blocks")
+  
+  # step 1 : intersect all CN profiles from cells belonging to the same cluster
+  step1 <- paste0('step1.bed')
+  multiple_beds <- paste(single_cells_cn,collapse = ' ')
+  cmd <- paste('bedops --partition',multiple_beds,'>',step1)
+  system(cmd)
+  
+  # step 2 : intersect step1 with all BEDs to assign CN to each genomic segment 
+  step2 <- paste0('step2.bed')
+  # cmd <- paste('intersectBed -a',step1,'-b',multiple_beds,'-wa -wb | cut -f1,2,3,8 >',step2)
+  cmd <- paste('intersectBed -a',step1,'-b',multiple_beds,'-wa -wb | cut -f1,2,3,8,9 >',step2)
+  system(cmd)
+
+  # step 3 : write consensus copy number blocks in each cell
+  m <- fread(file = step2,header = FALSE,stringsAsFactors = FALSE,data.table = FALSE)
+  
+  out <- split(m, f = m[,5] )
+  
+  ## make sure that all cells have same number of copy number blocks
+  a <- out[[1]]
+  a <- unite(a,col = group,seq(1,3),sep = ":",remove=FALSE)
+  CELL_ID <- a$V5[1]
+  a <- a[,c(1,5)]
+  colnames(a)[2] <- CELL_ID
+  
+  for(k in seq(2,length(out))){
+    b <- out[[k]]
+    b <- unite(b,col = group,seq(1,3),sep = ":",remove=FALSE)
+    CELL_ID <- b$V5[1]
+    b <- b[,c(1,5)]
+    colnames(b)[2] <- CELL_ID
+    a <- merge(x = a,y = b,by='group',all = TRUE)
+  }
+  
+  row.has.na <- apply(a, 1, function(x){any(is.na(x))})
+  message(paste("excluding",sum(row.has.na),"copy number blocks out of",nrow(a)))
+  
+  cn_blocks_to_keep <- a[!row.has.na,]
+  
+  # step4 : filtering out
+  for(k in seq(length(out))){
+    m <- out[[k]]
+    m <- unite(m,col = group,seq(1,3),sep = ":",remove=FALSE)
+    CELL_ID <- m$V5[1]
+    message(paste("filtering:",CELL_ID))
+    m <- m[which(m$group %in% unique( cn_blocks_to_keep$group )),]
+    
+    step5 <- paste0("step5_",CELL_ID,'.bed')
+    write.table(m[,2:5],file = step5,col.names = FALSE,row.names = FALSE,quote = FALSE,sep = "\t")
+    
+    # step 8 : add phased SNPs to each copy number block
+    step8 <- paste0('step8_',CELL_ID,'.bed')
+    cmd <- paste('intersectBed -a',step5,'-b',phased_snps,'-wa -wb >',step8)
+    system(cmd)
+
+    # step 9 : reduce table columns and write the final output
+    step9 <- paste0('step9_',CELL_ID,'.bed')
+    
+    m <- fread(file = step8,sep = "\t",header = FALSE, stringsAsFactors = FALSE, data.table = FALSE,select = c(1:4,5,6,8,9,14))
+    header <- c("CNB_CHROM","CNB_START","CNB_END","COPY_NUMBER","SNP_CHROM","SNP_POS","SNP_REF","SNP_ALT","SNP_PHASE_INFO")
+    colnames(m) <- header
+    
+    m <- m[,c("SNP_CHROM","SNP_POS","SNP_REF","SNP_ALT","SNP_PHASE_INFO","CNB_CHROM","CNB_START","CNB_END","COPY_NUMBER")]
+    write.table(m,file = step9,col.names = TRUE,row.names = FALSE,quote = FALSE,sep = "\t")
+    
+  }
+  message("done.")
   
 } else {
   ## unit: genes
@@ -117,69 +183,3 @@ if(genes=="NA"){
   }
   message("done.")
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-# GetAnnotedSNPs <- function(i,single_cells_cn,haplotype_blocks,phased_snps){
-#   bed_file <- single_cells_cn[i]
-#   message(basename(bed_file))
-#   CELL_ID <- gsub(basename(bed_file),pattern = "\\.bed$",replacement = "")
-#   
-#   # step 4 : intersect haplotype blocks with step3 
-#   step4 <- paste0('step4_',CELL_ID,'.bed')
-#   cmd <- paste('intersectBed -a',haplotype_blocks,'-b',bed_file,'-wa -wb >',step4)
-#   system(cmd)
-#   
-#   m <- fread(file = step4,sep = "\t",header = FALSE, stringsAsFactors = FALSE, data.table = FALSE,select = c(1:7))
-#   m[,7] <- round(m[,7])
-#   m <- unite(m,col = haploblock,seq(1,3),sep = ":",remove=FALSE)
-#   
-#   hb_to_exclude <- c(which(duplicated(m$haploblock,fromLast = FALSE)),which(duplicated(m$haploblock,fromLast = TRUE)))
-#   
-#   message(paste("removing",length(unique(m[hb_to_exclude,1])),"haplotype blocks out of",length(unique(m[,1]))))
-#   
-#   if(length(hb_to_exclude)>0){
-#     tab <- m[-hb_to_exclude,]
-#   } else {
-#     tab <- m
-#   }
-#   
-#   # step 5 : write haplo type blocks with associated copy number
-#   step5 <- paste0('step5_',CELL_ID,'.bed')
-#   write.table(tab[,c(2:4,8)],file = step5,col.names = FALSE,row.names = FALSE,quote = FALSE,sep = "\t")
-#   
-#   # step 7 : add phased SNPs to each block
-#   step7 <- paste0('step7_',CELL_ID,'.bed')
-#   cmd <- paste('intersectBed -a',step5,'-b',phased_snps,'-wa -wb >',step7)
-#   system(cmd)
-#   file.remove(step4,step5)
-#   
-#   # step 8 : reduce table columns and write the final output
-#   step8 <- paste0('step8_',CELL_ID,'.bed')
-# 
-#   m <- fread(file = step7,sep = "\t",header = FALSE, stringsAsFactors = FALSE, data.table = FALSE,select = c(1:6,8,9,14))
-#   header <- c("HB_CHROM","HB_START","HB_END","COPY_NUMBER","SNP_CHROM","SNP_POS","SNP_REF","SNP_ALT","SNP_PHASE_INFO")
-#   colnames(m) <- header
-#   
-#   reduce_info <- function(info){
-#     return(unlist(strsplit(info,split = ":"))[1])
-#   }
-#   
-#   m$SNP_PHASE_INFO <- unlist(lapply(X = m$SNP_PHASE_INFO,FUN = reduce_info))
-#   
-#   m <- m[,c("SNP_CHROM","SNP_POS","SNP_REF","SNP_ALT","SNP_PHASE_INFO","HB_CHROM","HB_START","HB_END","COPY_NUMBER")]
-#   write.table(m,file = step8,col.names = TRUE,row.names = FALSE,quote = FALSE,sep = "\t")
-#   
-#   file.remove(step7)
-#   
-# }
