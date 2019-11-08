@@ -36,6 +36,7 @@ if(genes=="NA"){
   # cmd <- paste('intersectBed -a',step1,'-b',multiple_beds,'-wa -wb | cut -f1,2,3,8 >',step2)
   cmd <- paste('intersectBed -a',step1,'-b',multiple_beds,'-wa -wb | cut -f1,2,3,8,9 >',step2)
   system(cmd)
+  file.remove(step1)
 
   # step 3 : write consensus copy number blocks in each cell
   m <- fread(file = step2,header = FALSE,stringsAsFactors = FALSE,data.table = FALSE)
@@ -80,7 +81,7 @@ if(genes=="NA"){
     system(cmd)
 
     # step 9 : reduce table columns and write the final output
-    step9 <- paste0('step9_',CELL_ID,'.bed')
+    step9 <- paste0('xci_',CELL_ID,'.bed')
     
     m <- fread(file = step8,sep = "\t",header = FALSE, stringsAsFactors = FALSE, data.table = FALSE,select = c(1:4,5,6,8,9,14))
     header <- c("CNB_CHROM","CNB_START","CNB_END","COPY_NUMBER","SNP_CHROM","SNP_POS","SNP_REF","SNP_ALT","SNP_PHASE_INFO")
@@ -89,6 +90,7 @@ if(genes=="NA"){
     m <- m[,c("SNP_CHROM","SNP_POS","SNP_REF","SNP_ALT","SNP_PHASE_INFO","CNB_CHROM","CNB_START","CNB_END","COPY_NUMBER")]
     write.table(m,file = step9,col.names = TRUE,row.names = FALSE,quote = FALSE,sep = "\t")
     
+    file.remove(step2,step5,step8)
   }
   message("done.")
   
@@ -172,7 +174,7 @@ if(genes=="NA"){
     message(paste("filtering:",basename(ks[k])))
   
     # step 9
-    step9 <- gsub(basename(ks[k]),pattern = "step8_",replacement = "step9_")
+    step9 <- gsub(basename(ks[k]),pattern = "step8_",replacement = "xci_")
     
     m <- fread(file = ks[k],stringsAsFactors = FALSE,header = TRUE, data.table = FALSE)
     m <- unite(m,col = group,seq(6,8),sep = ":",remove=FALSE)
@@ -181,5 +183,7 @@ if(genes=="NA"){
     write.table(m[,-6],file = step9,col.names = TRUE,row.names = FALSE,quote = FALSE,sep = "\t")
   
   }
+  remove.files <- list.files(path = outdir,pattern = "step5_|step8_",full.names = TRUE)
+  do.call(file.remove,list(remove.files))
   message("done.")
 }
