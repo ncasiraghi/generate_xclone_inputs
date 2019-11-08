@@ -112,7 +112,7 @@ if(genes=="NA"){
     m <- unite(m,col = group,seq(6,8),sep = ":",remove=FALSE)
     m <- m[which(m$group %in% unique( genes_to_keep$group )),]
     
-    write.table(m[,-6],file = step9,col.names = FALSE,row.names = FALSE,quote = FALSE,sep = "\t")
+    write.table(m[,-6],file = step9,col.names = TRUE,row.names = FALSE,quote = FALSE,sep = "\t")
   
   }
   message("done.")
