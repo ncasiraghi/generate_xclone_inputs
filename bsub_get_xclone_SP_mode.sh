@@ -5,7 +5,7 @@
 #BSUB -e xclone_input.log 
 #BSUB -o xclone_input.txt 
 
-module load R/3.6.0 bedtools/2.24.0
+module load R/3.6.0 bedtools/2.24.0 bedops/2.4.14
 
 single_cells_cn="/icgc/dkfzlsdf/analysis/B260/projects/chromothripsis_medulloblastoma/xclone_inputs/GTseq/STP-PDX/single_cells_cn.txt"
 genes="/icgc/dkfzlsdf/analysis/B260/users/n790i/generate_xclone_inputs/data/humangenes_biomart_GRCh37p13_TranscriptStartEnd.sort.merged.unique.bed"
