@@ -111,7 +111,7 @@ for(k in seq_len(length(ks))){
 
 }
 
-remove.files <- list.files(path = outdir,pattern = "step4_|step5_|step7_|step_8",full.names = TRUE)
+remove.files <- list.files(path = outdir,pattern = "step4_|step5_|step7_|step8_",full.names = TRUE)
 do.call(file.remove,list(remove.files))
 
 message("done.")
