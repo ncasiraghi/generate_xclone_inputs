@@ -22,7 +22,6 @@ library( parallel )
 setwd( outdir )
 GetAnnotedSNPs <- function(i,single_cells_cn,haplotype_blocks,phased_snps){
   bed_file <- single_cells_cn[i]
-  message(basename(bed_file))
   CELL_ID <- gsub(basename(bed_file),pattern = "\\.bed$",replacement = "")
   
   # step 4 : intersect haplotype blocks with step3 
@@ -52,8 +51,7 @@ GetAnnotedSNPs <- function(i,single_cells_cn,haplotype_blocks,phased_snps){
   step7 <- paste0('step7_',CELL_ID,'.bed')
   cmd <- paste('intersectBed -a',step5,'-b',phased_snps,'-wa -wb >',step7)
   system(cmd)
-  file.remove(step4,step5)
-  
+
   # step 8 : reduce table columns and write the final output
   step8 <- paste0('step8_',CELL_ID,'.bed')
 
@@ -70,10 +68,50 @@ GetAnnotedSNPs <- function(i,single_cells_cn,haplotype_blocks,phased_snps){
   m <- m[,c("SNP_CHROM","SNP_POS","SNP_REF","SNP_ALT","SNP_PHASE_INFO","HB_CHROM","HB_START","HB_END","COPY_NUMBER")]
   write.table(m,file = step8,col.names = TRUE,row.names = FALSE,quote = FALSE,sep = "\t")
   
-  file.remove(step7)
-  
 }
 
-message("running in mode: Read Phasing")
+message("running in mode: Read Phasing & unit: haplotype_blocks")
 mclapply(seq(single_cells_cn),GetAnnotedSNPs,single_cells_cn=single_cells_cn,haplotype_blocks=haplotype_blocks,phased_snps=phased_snps,mc.cores = mc.cores)
+
+# keep only gene that are present in all cells
+ks <- list.files(path = file.path(outdir),pattern = 'step5_',full.names = TRUE)
+
+a <- fread(file = ks[1],stringsAsFactors = FALSE,header = FALSE, data.table = FALSE)
+a <- unite(a,col = group,seq(1,3),sep = ":",remove=FALSE)
+a <- a[,c(1,5)]
+colnames(a)[2] <- basename(ks[1])
+
+for(k in seq(2,length(ks))){
+  b <- fread(file = ks[k],stringsAsFactors = FALSE,header = FALSE, data.table = FALSE)
+  b <- unite(b,col = group,seq(1,3),sep = ":",remove=FALSE)
+  b <- b[,c(1,5)]
+  colnames(b)[2] <- basename(ks[k])
+  a <- merge(x = a,y = b,by='group',all = TRUE)
+}
+
+row.has.na <- apply(a, 1, function(x){any(is.na(x))})
+message(paste("excluding",sum(row.has.na),"haplotype blocks out of",nrow(a)))
+
+hb_to_keep <- a[!row.has.na,]
+
+# step9 : filtering step8
+ks <- list.files(path = file.path(outdir),pattern = 'step8_',full.names = TRUE)
+
+for(k in seq_len(length(ks))){
+  message(paste("filtering:",basename(ks[k])))
+
+  # step 9
+  step9 <- gsub(basename(ks[k]),pattern = "step8_",replacement = "xci_")
+
+  m <- fread(file = ks[k],stringsAsFactors = FALSE,header = TRUE, data.table = FALSE)
+  m <- unite(m,col = group,seq(6,8),sep = ":",remove=FALSE)
+  m <- m[which(m$group %in% unique( hb_to_keep$group )),]
+
+  write.table(m[,-6],file = step9,col.names = TRUE,row.names = FALSE,quote = FALSE,sep = "\t")
+
+}
+
+remove.files <- list.files(path = outdir,pattern = "step4_|step5_|step7_|step_8",full.names = TRUE)
+do.call(file.remove,list(remove.files))
+
 message("done.")
