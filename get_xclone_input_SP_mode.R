@@ -33,14 +33,13 @@ if(genes=="NA"){
   
   # step 2 : intersect step1 with all BEDs to assign CN to each genomic segment 
   step2 <- paste0('step2.bed')
-  # cmd <- paste('intersectBed -a',step1,'-b',multiple_beds,'-wa -wb | cut -f1,2,3,8 >',step2)
   cmd <- paste('intersectBed -a',step1,'-b',multiple_beds,'-wa -wb | cut -f1,2,3,8,9 >',step2)
   system(cmd)
   file.remove(step1)
 
   # step 3 : write consensus copy number blocks in each cell
   m <- fread(file = step2,header = FALSE,stringsAsFactors = FALSE,data.table = FALSE)
-  
+  m[,4] <- round(m[,4])
   out <- split(m, f = m[,5] )
   
   ## make sure that all cells have same number of copy number blocks
@@ -59,6 +58,7 @@ if(genes=="NA"){
     a <- merge(x = a,y = b,by='group',all = TRUE)
   }
   
+  file.remove(step2)
   row.has.na <- apply(a, 1, function(x){any(is.na(x))})
   message(paste("excluding",sum(row.has.na),"copy number blocks out of",nrow(a)))
   
@@ -90,7 +90,8 @@ if(genes=="NA"){
     m <- m[,c("SNP_CHROM","SNP_POS","SNP_REF","SNP_ALT","SNP_PHASE_INFO","CNB_CHROM","CNB_START","CNB_END","COPY_NUMBER")]
     write.table(m,file = step9,col.names = TRUE,row.names = FALSE,quote = FALSE,sep = "\t")
     
-    file.remove(step2,step5,step8)
+    file.remove(step5)
+    file.remove(step8)
   }
   message("done.")
   
