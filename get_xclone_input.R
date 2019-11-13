@@ -22,7 +22,7 @@ library( parallel )
 
 setwd( outdir )
 
-if(genes=="NA"){
+if(unit=="NA"){
   ## unit: cn_blocks 
   message("running in mode: Statistical Phasing & unit: cn_blocks")
   
@@ -100,7 +100,6 @@ if(genes=="NA"){
   
   message(paste("running in mode: Statistical Phasing & unit based on:",unit))
   
-  ## unit: genes
   GetAnnotedSNPs <- function(i,single_cells_cn,unit,phased_snps){
     bed_file <- single_cells_cn[i]
     CELL_ID <- gsub(basename(bed_file),pattern = "\\.bed$",replacement = "")
@@ -173,7 +172,7 @@ if(genes=="NA"){
   }
   
   row.has.na <- apply(a, 1, function(x){any(is.na(x))})
-  message(paste("excluding",sum(row.has.na),"genes out of",nrow(a)))
+  message(paste("excluding",sum(row.has.na),"units out of",nrow(a)))
   
   unit_to_keep <- a[!row.has.na,]
   
