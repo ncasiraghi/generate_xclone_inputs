@@ -54,7 +54,11 @@ df$ASR_rna <- df$AD_rna/df$DP_rna
 }
 
 m <- df[which(df$COPY_NUMBER %in% c(1:3)),]
-m <- m[which(m$DP_dna > 10 & m$DP_rna > 10),]
+m <- m[grep(m$group,pattern = "^3:"),]
+
+barplot(table(m$COPY_NUMBER))
+
+m <- m[which(m$DP_dna > 0 & m$DP_rna > 0),]
 
 par(pty="s",mfrow=c(3,2))
 boxplot(DP_dna ~ COPY_NUMBER,data = m,varwidth=TRUE,outline=FALSE)
