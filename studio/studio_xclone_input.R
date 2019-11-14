@@ -1,7 +1,50 @@
 library( tidyr )
+library( parallel )
+library( Matrix )
+library( data.table )
+
 setwd("/icgc/dkfzlsdf/analysis/B260/users/n790i/generate_xclone_inputs/studio/")
 
 ## GTseq
+cellsnp <- "/icgc/dkfzlsdf/analysis/B260/projects/chromothripsis_medulloblastoma/single_cell_integration_dna_rna/scase/cellSNP_test/scDNA_data/sample_3/sparseVCF/"
+dp.mtx.file  <- file.path(cellsnp,"cellSNP.tag.DP.mtx")
+samples.file <- file.path(cellsnp,"cellSNP.samples.tsv")
+snps.file <- file.path(cellsnp,"cellSNP.base.vcf.gz")
+units.file <- "/icgc/dkfzlsdf/analysis/B260/projects/chromothripsis_medulloblastoma/xclone_inputs/GTseq/STP-PDX/mode_RP/unit_haplotype_blocks/xci_lane1DNAA10_sequence.cbs.nochr.bed"
+
+getStatTab <- function(dp.mtx.file,units.file,samples.file){
+  
+  dp.mtx <- readMM(file = dp.mtx.file)
+  units <- fread(input = units.file,data.table = FALSE,stringsAsFactors = FALSE)
+  snps <- fread(input = snps.file,data.table = FALSE,stringsAsFactors = FALSE,skip = 1,select = c(1,2))
+  snps[,1] <- gsub(snps[,1],pattern = "chr",replacement = "")
+  snps <- unite(snps,col = SNP,seq(1,2),sep = ":",remove=TRUE)
+  
+  samples <- readLines(samples.file)
+  
+  units <- unite(units,col = UNIT,seq(6,8),sep = ":",remove=TRUE)
+  out <- split(units, f = units[,6])
+  
+  getDP <- function(i,out,snps,dp.mtx){
+    u <- out[[i]]
+    u <- unite(u,col = SNP,seq(1,2),sep = ":",remove=TRUE)
+    x <- dp.mtx[which(snps$SNP %in% unique(u$SNP)),,drop=FALSE]
+    if(nrow(x)>0){
+      tab <- cbind(rowSums(x,na.rm = F), round(rowMeans(x,na.rm = F)),3)
+      return(tab)
+    } else {
+      return(NULL)
+    }
+  }
+  m <- mclapply(seq(length(out)),getDP,out=out,snps=snps,dp.mtx=dp.mtx,mc.cores = 3)
+  names(m) <- names(out)
+  
+  save(out,m,file = "snps_DP_count_per_unit.RData",compress = TRUE)
+  
+}
+
+
+
 
 # scDNA
 if(F){
