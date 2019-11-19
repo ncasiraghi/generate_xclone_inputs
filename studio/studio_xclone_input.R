@@ -3,17 +3,33 @@ library( parallel )
 library( Matrix )
 library( data.table )
 
-setwd("/icgc/dkfzlsdf/analysis/B260/users/n790i/generate_xclone_inputs/studio/rna/")
-cores <- 50
+cores <- 30
 
-## GTseq
-cellsnp <- "/icgc/dkfzlsdf/analysis/B260/projects/chromothripsis_medulloblastoma/single_cell_integration_dna_rna/scase/cellSNP_test/scRNA_data/sample_3/sparseVCF"
+omic <- "rna"
+
+# GenomicUnit <- "/icgc/dkfzlsdf/analysis/B260/projects/chromothripsis_medulloblastoma/xclone_inputs/GTseq/STP-PDX/mode_SP/unit_cn_blocks/"
+GenomicUnit <- "/icgc/dkfzlsdf/analysis/B260/projects/chromothripsis_medulloblastoma/xclone_inputs/GTseq/STP-PDX/mode_SP/unit_genes/"
+
+## GTseq - DNA
+if(omic=="dna"){
+  setwd("/icgc/dkfzlsdf/analysis/B260/users/n790i/generate_xclone_inputs/studio/dna_unit_genes")
+  cellsnp <- "/icgc/dkfzlsdf/analysis/B260/projects/chromothripsis_medulloblastoma/single_cell_integration_dna_rna/scase/cellSNP_test/scDNA_data/sample_3/sparseVCF"
+}
+
+## GTseq - RNA
+if(omic=="rna"){
+  setwd("/icgc/dkfzlsdf/analysis/B260/users/n790i/generate_xclone_inputs/studio/rna_unit_genes")
+  cellsnp <- "/icgc/dkfzlsdf/analysis/B260/projects/chromothripsis_medulloblastoma/single_cell_integration_dna_rna/scase/cellSNP_test/scRNA_data/sample_3/sparseVCF"
+}
+
+getwd()
+
 dp.mtx.file  <- file.path(cellsnp,"cellSNP.tag.DP.mtx")
 ad.mtx.file  <- file.path(cellsnp,"cellSNP.tag.AD.mtx")
 samples.file <- file.path(cellsnp,"cellSNP.samples.tsv")
 snps.file <- file.path(cellsnp,"cellSNP.base.vcf.gz")
 
-xci.files <- list.files("/icgc/dkfzlsdf/analysis/B260/projects/chromothripsis_medulloblastoma/xclone_inputs/GTseq/STP-PDX/mode_RP/unit_haplotype_blocks",pattern = "xci_",full.names = TRUE)
+xci.files <- list.files(GenomicUnit,pattern = "xci_",full.names = TRUE)
 
 dp.mtx <- readMM(file = dp.mtx.file)
 ad.mtx <- readMM(file = ad.mtx.file)
@@ -22,7 +38,15 @@ snps[,1] <- gsub(snps[,1],pattern = "chr",replacement = "")
 snps <- unite(snps,col = SNP,seq(1,2),sep = ":",remove=TRUE)
 
 samples <- readLines(samples.file)
-samples <- gsub(samples,pattern = ".Aligned.sortedByCoord.out.bam",replacement = "")
+
+if(omic=="dna"){
+  samples <- gsub(samples,pattern = "lane1DNA|_sequence.bam",replacement = "")
+}
+if(omic=="rna"){
+  samples <- gsub(samples,pattern = ".Aligned.sortedByCoord.out.bam",replacement = "")
+}
+
+cat(samples)
 
 getDP <- function(i,xci.files,snps,dp.mtx){
   xc <- xci.files[i]
@@ -39,14 +63,168 @@ getDP <- function(i,xci.files,snps,dp.mtx){
 
 mclapply(seq(length(xci.files)),getDP,xci.files=xci.files,snps=snps,dp.mtx=dp.mtx,mc.cores = cores)
 
-# plot snps ASR distribution
 
 
+# SNP analysis
+if( FALSE ){
+
+#bed <- list.files("/icgc/dkfzlsdf/analysis/B260/users/n790i/generate_xclone_inputs/studio/dna_unit_genes",pattern = "\\.bed$",full.names = T)
+bed <- list.files("/icgc/dkfzlsdf/analysis/B260/users/n790i/generate_xclone_inputs/studio/rna_unit_genes",pattern = "\\.bed$",full.names = T)
+  
+DataFilter <- function(i,bed,minDP=1,maxDP=Inf,minAD=0,cn=NA,maxCN=5){
+  message(i)
+  x <- fread(bed[i],data.table = FALSE)
+  x <- x[which(x$SNP_DP >= minDP & x$SNP_DP <= maxDP),]
+  x <- x[which(x$SNP_AD >= minAD),]
+  x <- x[which(x$COPY_NUMBER <= maxCN),]
+  if(unique(!is.na(cn))){
+    x <- x[which(x$COPY_NUMBER %in% cn),,drop=FALSE]
+  }
+  if(nrow(x)==0){
+    return(NULL)
+  } else {
+    x$SNP_ASR <- x$SNP_AD/x$SNP_DP
+    x$CELL_ID <- gsub(basename(bed[i]),pattern = "xci_dp_lane1DNA|_sequence.cbs.nochr.bed",replacement = "")
+    return(x)
+  }
+}
+
+df.all <- do.call(rbind,mclapply(seq(length(bed)),DataFilter,bed=bed,cn=2,mc.cores = cores))
+
+summary(df.all$COPY_NUMBER)
+quantile(df.all$SNP_DP)
+quantile(df.all$SNP_DP,probs = seq(0,1,0.01))
 
 
+plotres <- function(df,title){
+  
+  boxplot(df$SNP_DP,df$SNP_AD,outline = F,names = c("DP","AD"),ylab="n. reads",main=title)
+  text(1:2,y = c(median(df$SNP_DP),median(df$SNP_AD)), labels = c(median(df$SNP_DP),median(df$SNP_AD)),pos = 3)
+  
+  hist(df$SNP_ASR,20,col="grey",border = "grey",xlab = "ASR",xlim=c(0,1),main="")
+  abline(v = median(df$SNP_ASR),col="orangered")
+  
+  plot(density(df$SNP_ASR),col="black",lwd=4,xlab = "ASR",main=title)
+  
+}
 
-# select the most covered SNPs and select units
+par(pty="s",mfrow=c(1,2))
 
+# check in diploid segments
+minDP <- quantile(df.all$SNP_DP,probs = 0.99)
+minDP <- 20
+
+df <- do.call(rbind,mclapply(seq(length(bed)),DataFilter,bed=bed,minDP=minDP,maxDP=Inf,minAD=0,cn=2,mc.cores = cores))
+
+summary(df$COPY_NUMBER)
+summary(df$SNP_DP)
+summary(df$SNP_AD)
+
+plotres(df,title = "SNPs in CN = 2")
+
+
+# check in segments with CN = 1
+df <- do.call(rbind,mclapply(seq(length(bed)),DataFilter,bed=bed,minDP=minDP,maxDP=Inf,minAD=0,cn=1,mc.cores = cores))
+
+summary(df$COPY_NUMBER)
+summary(df$SNP_DP)
+summary(df$SNP_AD)
+
+plotres(df,title = "SNPs in CN = 1")
+
+}
+
+# Gene analysis
+
+GenomicUnit <- "/icgc/dkfzlsdf/analysis/B260/projects/chromothripsis_medulloblastoma/xclone_inputs/GTseq/STP-PDX/mode_SP/unit_genes/"
+xci.files <- list.files(GenomicUnit,pattern = "xci_",full.names = TRUE)
+
+tab <- c()
+for(i in seq(length(xci.files))){
+  message(i,"\t",basename(xci.files[i]))
+  if(i==1){
+    xc <- xci.files[i]
+    m <- unique(fread(xc,data.table = F,select = c(6:8,11)))
+    m <- unite(m,col = UNIT,seq(1,3),sep = ":",remove=TRUE)
+    names(m)[2] <- gsub(basename(xc),pattern = "xci_lane1DNA|_sequence.cbs.nochr.bed",replacement = "")
+    tab <- m
+  } else {
+    xc <- xci.files[i]
+    m <- unique(fread(xc,data.table = F,select = c(6:8,11)))
+    m <- unite(m,col = UNIT,seq(1,3),sep = ":",remove=TRUE)
+    names(m)[2] <- gsub(basename(xc),pattern = "xci_lane1DNA|_sequence.cbs.nochr.bed",replacement = "")
+    tab <- merge(tab,m,by = "UNIT",all = TRUE)
+  }
+}
+
+save(tab,file = "tab.rna.RData",compress = T)
+
+cn1 <- rowSums(tab == 1)/ncol(tab)
+cn2 <- rowSums(tab == 2)/ncol(tab)
+
+par(pty='s')
+col <- rep("grey60",length(cn1))
+
+selected_genes <- intersect(which(cn1 > 0.3 & cn1 < 0.7),which(cn2 > 0.3 & cn2 < 0.7))
+
+col[selected_genes] <- "orangered"
+
+plot(cn1,cn2,pch=20,
+     xlab = "fraction of cells with this gene in CN = 1",
+     ylab = "fraction of cells with this gene in CN = 2",ylim=c(0,1),xlim=c(0,1),
+     col=col,main=paste("selected genes = ",length(selected_genes)))
+
+
+#bed <- list.files("/icgc/dkfzlsdf/analysis/B260/users/n790i/generate_xclone_inputs/studio/dna_unit_genes",pattern = "\\.bed$",full.names = T)
+#bed <- list.files("/icgc/dkfzlsdf/analysis/B260/users/n790i/generate_xclone_inputs/studio/rna_unit_genes",pattern = "\\.bed$",full.names = T)
+
+df <- do.call(rbind,mclapply(seq(length(bed)),DataFilter,bed=bed,minDP=10,cn=c(1,2),mc.cores = cores))
+
+summary(df$COPY_NUMBER)
+summary(df$SNP_DP)
+summary(df$SNP_AD)
+
+df <- unite(df,col = UNIT,seq(5,7),sep = ":",remove=TRUE)
+
+genes_cn1 <- c()
+genes_cn2 <- c()
+for(gene in tab$UNIT[selected_genes]){
+  message(gene)
+  u <- df[which(df$UNIT == gene),,drop=F]
+  if(nrow(u) > 0){
+    summaryGene <- function(u,cn){
+      g <- u[which(u$COPY_NUMBER == cn),,drop=FALSE]
+      if(nrow(g) > 0){
+        this <- data.frame(UNIT=unique(g$UNIT),
+                           CN=unique(g$COPY_NUMBER),
+                           SNPS=nrow(g),
+                           CELLS=length(unique(g$CELL_ID)),
+                           DP=sum(g$SNP_DP),
+                           AD=sum(g$SNP_AD),
+                           ASR=sum(g$SNP_AD)/sum(g$SNP_DP),stringsAsFactors = F)
+        return(this)
+      } else {
+        return(NULL)
+      }
+    }
+    
+    genes_cn1 <- rbind(genes_cn1,summaryGene(u=u,cn=1))
+    genes_cn2 <- rbind(genes_cn2,summaryGene(u=u,cn=2))
+  }
+}
+
+gcn <- merge(x = genes_cn1,genes_cn2,by = "UNIT",all = FALSE,suffixes = c("_cn1","_cn2"))
+
+# Add boxplots to a scatterplot
+library(vioplot)
+
+par(pty="s",mfrow=c(1,2))
+plot(gcn$ASR_cn1,gcn$ASR_cn2,xlab="ASR when gene in CN = 1",ylab="ASR when gene in CN = 2",xlim=c(0,1),ylim=c(0,1))
+vioplot(gcn$ASR_cn1,gcn$ASR_cn2,names = c("CN = 1", "CN = 2"),ylab="ASR",col="white",rectCol = "white",colMed = "black")
+#vioplot(gcn$DP_cn1,gcn$DP_cn2,names = c("CN = 1", "CN = 2"),ylab="DP",col="white",rectCol = "white",colMed = "black")
+mtext("scRNA", side=3, outer=TRUE, line=-3)
+
+# old
 if( FALSE ){
 
 # scDNA

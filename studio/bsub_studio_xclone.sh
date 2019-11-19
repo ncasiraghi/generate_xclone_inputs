@@ -1,6 +1,6 @@
 #!/bin/sh 
 #BSUB -J xclone_input
-#BSUB -n 50
+#BSUB -n 30
 #BSUB -q long
 #BSUB -e xclone_input.log 
 #BSUB -o xclone_input.txt 

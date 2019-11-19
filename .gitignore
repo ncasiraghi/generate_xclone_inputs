@@ -1,3 +1,11 @@
+*.png
+*.pdf
+*.RData
+
+studio/*_unit_genes/
+studio/*.log
+studio/*.txt
+
 # History files
 .Rhistory
 .Rapp.history
