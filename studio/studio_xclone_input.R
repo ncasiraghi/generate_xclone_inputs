@@ -3,7 +3,7 @@ library( parallel )
 library( Matrix )
 library( data.table )
 
-cores <- 30
+cores <- 10
 
 omic <- "rna"
 
@@ -64,13 +64,8 @@ getDP <- function(i,xci.files,snps,dp.mtx){
 mclapply(seq(length(xci.files)),getDP,xci.files=xci.files,snps=snps,dp.mtx=dp.mtx,mc.cores = cores)
 
 
+## [ functions ]
 
-# SNP analysis
-if( FALSE ){
-
-#bed <- list.files("/icgc/dkfzlsdf/analysis/B260/users/n790i/generate_xclone_inputs/studio/dna_unit_genes",pattern = "\\.bed$",full.names = T)
-bed <- list.files("/icgc/dkfzlsdf/analysis/B260/users/n790i/generate_xclone_inputs/studio/rna_unit_genes",pattern = "\\.bed$",full.names = T)
-  
 DataFilter <- function(i,bed,minDP=1,maxDP=Inf,minAD=0,cn=NA,maxCN=5){
   message(i)
   x <- fread(bed[i],data.table = FALSE)
@@ -89,6 +84,13 @@ DataFilter <- function(i,bed,minDP=1,maxDP=Inf,minAD=0,cn=NA,maxCN=5){
   }
 }
 
+
+# SNP analysis
+if( FALSE ){
+
+#bed <- list.files("/icgc/dkfzlsdf/analysis/B260/users/n790i/generate_xclone_inputs/studio/dna_unit_genes",pattern = "\\.bed$",full.names = T)
+bed <- list.files("/icgc/dkfzlsdf/analysis/B260/users/n790i/generate_xclone_inputs/studio/rna_unit_genes",pattern = "\\.bed$",full.names = T)
+  
 df.all <- do.call(rbind,mclapply(seq(length(bed)),DataFilter,bed=bed,cn=2,mc.cores = cores))
 
 summary(df.all$COPY_NUMBER)
@@ -157,15 +159,13 @@ for(i in seq(length(xci.files))){
   }
 }
 
-save(tab,file = "tab.rna.RData",compress = T)
-
 cn1 <- rowSums(tab == 1)/ncol(tab)
 cn2 <- rowSums(tab == 2)/ncol(tab)
 
 par(pty='s')
 col <- rep("grey60",length(cn1))
 
-selected_genes <- intersect(which(cn1 > 0.3 & cn1 < 0.7),which(cn2 > 0.3 & cn2 < 0.7))
+selected_genes <- intersect(which(cn1 > 0.4 & cn1 < 0.6),which(cn2 > 0.4 & cn2 < 0.6))
 
 col[selected_genes] <- "orangered"
 
@@ -178,7 +178,7 @@ plot(cn1,cn2,pch=20,
 #bed <- list.files("/icgc/dkfzlsdf/analysis/B260/users/n790i/generate_xclone_inputs/studio/dna_unit_genes",pattern = "\\.bed$",full.names = T)
 #bed <- list.files("/icgc/dkfzlsdf/analysis/B260/users/n790i/generate_xclone_inputs/studio/rna_unit_genes",pattern = "\\.bed$",full.names = T)
 
-df <- do.call(rbind,mclapply(seq(length(bed)),DataFilter,bed=bed,minDP=10,cn=c(1,2),mc.cores = cores))
+df <- do.call(rbind,mclapply(seq(length(bed)),DataFilter,bed=bed,minDP=1,cn=c(1,2),mc.cores = cores))
 
 summary(df$COPY_NUMBER)
 summary(df$SNP_DP)
@@ -219,8 +219,8 @@ gcn <- merge(x = genes_cn1,genes_cn2,by = "UNIT",all = FALSE,suffixes = c("_cn1"
 library(vioplot)
 
 par(pty="s",mfrow=c(1,2))
-plot(gcn$ASR_cn1,gcn$ASR_cn2,xlab="ASR when gene in CN = 1",ylab="ASR when gene in CN = 2",xlim=c(0,1),ylim=c(0,1))
-vioplot(gcn$ASR_cn1,gcn$ASR_cn2,names = c("CN = 1", "CN = 2"),ylab="ASR",col="white",rectCol = "white",colMed = "black")
+plot(abs(0.5-gcn$ASR_cn1),abs(0.5-gcn$ASR_cn2),xlab="abs(0.5-ASR) in CN=1",ylab="abs(0.5-ASR) in CN=2",xlim=c(0,0.5),ylim=c(0,0.5))
+vioplot(abs(0.5-gcn$ASR_cn1),abs(0.5-gcn$ASR_cn2),names = c("CN = 1", "CN = 2"),ylab="abs(0.5-ASR)",col="white",rectCol = "white",colMed = "black")
 #vioplot(gcn$DP_cn1,gcn$DP_cn2,names = c("CN = 1", "CN = 2"),ylab="DP",col="white",rectCol = "white",colMed = "black")
 mtext("scRNA", side=3, outer=TRUE, line=-3)
 
