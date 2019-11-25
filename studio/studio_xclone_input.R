@@ -1,11 +1,42 @@
-library( tidyr )
+library( tidyverse )
 library( parallel )
 library( Matrix )
 library( data.table )
 library( vioplot )
-library( VennDiagram )
 
 cores <- 10
+
+## [ functions ]
+
+DataFilter <- function(i,bed,minDP=2,maxDP=Inf,minAD=0,cn=NA,maxCN=5){
+  message(i)
+  x <- fread(bed[i],data.table = FALSE)
+  x <- x[which(x$SNP_DP >= minDP & x$SNP_DP <= maxDP),]
+  x <- x[which(x$SNP_AD >= minAD),]
+  x <- x[which(x$COPY_NUMBER <= maxCN),]
+  if(unique(!is.na(cn))){
+    x <- x[which(x$COPY_NUMBER %in% cn),,drop=FALSE]
+  }
+  if(nrow(x)==0){
+    return(NULL)
+  } else {
+    x$SNP_ASR <- x$SNP_AD/x$SNP_DP
+    x$CELL_ID <- gsub(basename(bed[i]),pattern = "xci_dp_lane1DNA|_sequence.cbs.nochr.bed",replacement = "")
+    return(x)
+  }
+}
+
+plotres <- function(df,title){
+  
+  boxplot(df$SNP_DP,df$SNP_AD,outline = F,names = c("DP","AD"),ylab="n. reads",main=title)
+  text(1:2,y = c(median(df$SNP_DP),median(df$SNP_AD)), labels = c(median(df$SNP_DP),median(df$SNP_AD)),pos = 3)
+  
+  hist(df$SNP_ASR,20,col="grey",border = "grey",xlab = "ASR",xlim=c(0,1),main="")
+  abline(v = median(df$SNP_ASR),col="orangered")
+  
+  plot(density(df$SNP_ASR),col="black",lwd=4,xlab = "ASR",main=title)
+  
+}
 
 # generate data 
 if(FALSE){
@@ -70,49 +101,21 @@ mclapply(seq(length(xci.files)),getDP,xci.files=xci.files,snps=snps,dp.mtx=dp.mt
 
 }
 
-## [ functions ]
-
-DataFilter <- function(i,bed,minDP=2,maxDP=Inf,minAD=0,cn=NA,maxCN=5){
-  message(i)
-  x <- fread(bed[i],data.table = FALSE)
-  x <- x[which(x$SNP_DP >= minDP & x$SNP_DP <= maxDP),]
-  x <- x[which(x$SNP_AD >= minAD),]
-  x <- x[which(x$COPY_NUMBER <= maxCN),]
-  if(unique(!is.na(cn))){
-    x <- x[which(x$COPY_NUMBER %in% cn),,drop=FALSE]
-  }
-  if(nrow(x)==0){
-    return(NULL)
-  } else {
-    x$SNP_ASR <- x$SNP_AD/x$SNP_DP
-    x$CELL_ID <- gsub(basename(bed[i]),pattern = "xci_dp_lane1DNA|_sequence.cbs.nochr.bed",replacement = "")
-    return(x)
-  }
-}
-
-plotres <- function(df,title){
-  
-  boxplot(df$SNP_DP,df$SNP_AD,outline = F,names = c("DP","AD"),ylab="n. reads",main=title)
-  text(1:2,y = c(median(df$SNP_DP),median(df$SNP_AD)), labels = c(median(df$SNP_DP),median(df$SNP_AD)),pos = 3)
-  
-  hist(df$SNP_ASR,20,col="grey",border = "grey",xlab = "ASR",xlim=c(0,1),main="")
-  abline(v = median(df$SNP_ASR),col="orangered")
-  
-  plot(density(df$SNP_ASR),col="black",lwd=4,xlab = "ASR",main=title)
-  
-}
-
 # SNP analysis
 
 bed.dna <- list.files("/icgc/dkfzlsdf/analysis/B260/users/n790i/generate_xclone_inputs/studio/dna_unit_genes",pattern = "\\.bed$",full.names = T)
 bed.rna <- list.files("/icgc/dkfzlsdf/analysis/B260/users/n790i/generate_xclone_inputs/studio/rna_unit_genes",pattern = "\\.bed$",full.names = T)
 
+# SNPs with DP > th in DNA and RNA - cell annotated
 df.all.dna <- do.call(rbind,mclapply(seq(length(bed.dna)),DataFilter,minDP=1,bed=bed.dna,cn=NA,mc.cores = cores))
 df.all.rna <- do.call(rbind,mclapply(seq(length(bed.rna)),DataFilter,minDP=1,bed=bed.rna,cn=NA,mc.cores = cores))
 
+# Number of SNPs with DP in DNA and RNA - per cell
 m <- merge(data.frame(table(df.all.dna$CELL_ID),stringsAsFactors = F),
-           data.frame(table(df.all.rna$CELL_ID),stringsAsFactors = F),by = "Var1",suffixes = c('_dna','_rna'))
+           data.frame(table(df.all.rna$CELL_ID),stringsAsFactors = F),
+           by = "Var1",suffixes = c('_dna','_rna'))
 
+# Plot1 | n. of SNPs per cell in DNA and RNA
 png("studio/png/Plot1.png",width = 14,height = 7,units = 'in', res = 300)
 
 layout(matrix(c(1,1,1,3,3,
@@ -124,6 +127,7 @@ vioplot(m$Freq_dna,m$Freq_rna,names = c("scDNA", "scRNA"),ylab="n. of SNPs per c
 
 dev.off()
 
+# Plot2 | DP of SNPs in DNA and RNA 
 png("studio/png/Plot2.png",width = 14,height = 7,units = 'in', res = 300)
 
 par(pty='s',mfrow=c(1,2))
@@ -133,10 +137,11 @@ vioplot(df.all.dna$SNP_DP,df.all.rna$SNP_DP,names = c("scDNA", "scRNA"),pchMed =
 
 dev.off()
 
-
+# SNPs with DP in both DNA and RNA - annotated per cell
 dfm <- merge(x = df.all.dna[,c(1,5:7,10:14)],df.all.rna[,c(1,5:7,10:14)],by = c('SNP','CELL_ID','COPY_NUMBER',"GENE_CHROM","GENE_START","GENE_END"),all = FALSE,suffixes = c('_dna','_rna'))
 dfm <- unite(dfm,col = UNIT,seq(4,6),sep = ":",remove=TRUE)
 
+# Plot3 | SNPs with DP in both DNA and RNA per cell 
 png("studio/png/Plot3.png",width = 14,height = 7,units = 'in', res = 300)
 
 layout(matrix(c(1,1,1,1,2,2,
@@ -151,7 +156,20 @@ vioplot(dfm$SNP_DP_dna,dfm$SNP_DP_rna,names = c("scDNA", "scRNA"),pchMed = 20,yl
 
 dev.off()
 
-png("studio/png/Plot4.png",width = 15,height = 7,units = 'in', res = 300)
+# Plot4a | ASR absolute deviance from 0.5 for SNPs in copy number 2 segments
+png("studio/png/Plot4a.png",width = 15,height = 7,units = 'in', res = 300)
+
+par(pty='s')
+
+k.dna <- df.all.dna[which(df.all.dna$COPY_NUMBER==2),]
+k.rna <- df.all.rna[which(df.all.rna$COPY_NUMBER==2),]
+
+vioplot(abs(0.5-k.dna$SNP_ASR),abs(0.5-k.rna$SNP_ASR),names = c("scDNA", "scRNA"),pchMed = 20,ylab="|0.5-(AD/DP)|",col="white",rectCol = "white",colMed = "black")
+
+dev.off()
+
+# Plot4b | ASR absolute deviance from 0.5 for SNPs - considering only SNPs with DP in both DNA and RNA - in copy number 2 segments
+png("studio/png/Plot4b.png",width = 15,height = 7,units = 'in', res = 300)
 
 layout(matrix(c(1,1,2,2,3,
                 1,1,2,2,3),2,5,byrow = T))
@@ -166,6 +184,46 @@ vioplot(abs(0.5-k$SNP_ASR_dna),abs(0.5-k$SNP_ASR_rna),names = c("scDNA", "scRNA"
 
 dev.off()
 
+# Plot5a | ASR absolute deviance from 0.5 for GENEs in copy number 2 segments
+
+df.all.dna <- unite(df.all.dna,col = UNIT,seq(5,7),sep = ":",remove=FALSE)
+df.all.rna <- unite(df.all.rna,col = UNIT,seq(5,7),sep = ":",remove=FALSE)
+ 
+getCountPerGene <- function(tab,cn=2){
+  
+  x <- tab %>% filter(COPY_NUMBER == cn)
+  out <- split(x,f = x$UNIT)
+  
+  sumDP <- function(df){
+    return(sum(df$SNP_DP))
+  }
+  
+  sumAD <- function(df){
+    return(sum(df$SNP_AD))
+  }
+  
+  dp <- unlist(lapply(out,FUN = sumDP))
+  ad <- unlist(lapply(out,FUN = sumAD))
+  asr <- ad/dp
+  return(list(dp=dp,ad=ad,asr=asr))
+}
+
+genes.dna <- getCountPerGene(tab = df.all.dna,cn = 1)
+genes.rna <- getCountPerGene(tab = df.all.rna,cn = 1)
+
+png("studio/png/Plot5a.png",width = 8,height = 4,units = 'in', res = 300)
+
+layout(matrix(c(1,2,3,3,
+                1,2,3,3),2,4,byrow = T))
+
+vioplot(genes.dna$dp,genes.rna$dp,names = c("scDNA", "scRNA"),pchMed = 20,ylab="DP per gene",col="white",rectCol = "white",colMed = "black",frame.plot = F)
+boxplot(genes.dna$dp,genes.rna$dp,outline = F,names = c("scDNA", "scRNA"),ylab="DP per gene",frame.plot=F,main='(no outliers)')
+vioplot(abs(0.5-(genes.dna$asr)),abs(0.5-(genes.rna$asr)),names = c("scDNA", "scRNA"),pchMed = 20,ylab="|0.5-(AD/DP)| per gene",col="white",rectCol = "white",colMed = "black",frame.plot = F)
+
+dev.off()
+
+
+# Plot5b | ASR absolute deviance from 0.5 per GENEs - considering only SNPs with DP in both DNA and RNA - in copy number 2 segments
 d.dp <- c()
 d.ad <- c()
 r.dp <- c()
@@ -179,7 +237,7 @@ for( u in unique(dfm$UNIT[which(dfm$COPY_NUMBER==2)]) ){
   r.ad <- c(r.ad, sum(dfm$SNP_AD_rna[which(dfm$UNIT == u)]))
 }
 
-png("studio/png/Plot5.png",width = 15,height = 7,units = 'in', res = 300)
+png("studio/png/Plot5b.png",width = 15,height = 7,units = 'in', res = 300)
 
 layout(matrix(c(1,1,2,2,3,
                 1,1,2,2,3),2,5,byrow = T))
@@ -237,15 +295,19 @@ abline(h = c(0.4,0.6),v = c(0.4,0.6),lwd=0.4)
 dev.off()
 
 
-cate <- function(bed, selected_genes,minDP){
+cate <- function(bed, selected_genes,minDP,filter_snps=FALSE,selected_snps=NA){
   
   df <- do.call(rbind,mclapply(seq(length(bed)),DataFilter,bed=bed,minDP=minDP,cn=c(1,2),mc.cores = cores))
   df <- unite(df,col = UNIT,seq(5,7),sep = ":",remove=TRUE)
   
+  if(filter_snps){
+    df <- df[which(df$SNP %in% selected_snps),,drop=FALSE]
+  }
+
   genes_cn1 <- c()
   genes_cn2 <- c()
   for(gene in tab$UNIT[selected_genes]){
-    message(gene)
+    
     u <- df[which(df$UNIT == gene),,drop=F]
     if(nrow(u) > 0){
       summaryGene <- function(u,cn){
@@ -275,8 +337,8 @@ cate <- function(bed, selected_genes,minDP){
   
 }
 
-gcn.dna <- cate(bed.dna,selected_genes,minDP = 1)
-gcn.rna <- cate(bed.rna,selected_genes,minDP = 1)
+gcn.dna <- cate(bed.dna,selected_genes,minDP = 10,filter_snps = FALSE,selected_snps = unique(dfm$SNP))
+gcn.rna <- cate(bed.rna,selected_genes,minDP = 10,filter_snps = FALSE,selected_snps = unique(dfm$SNP))
 
 png("studio/png/Plot7.png",width = 7,height = 7,units = 'in', res = 300)
 
