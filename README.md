@@ -22,7 +22,7 @@ Rscript get_xclone_input.R [single_cells_cn] [unit] [phased_snps] [outdir] [mc.c
 
 ```
 
-### Copy number profiles of each cell (or sample) [`single_cells_cn`]
+### [`single_cells_cn`] Copy number profiles of each cell (or sample) 
 A **txt file** listing the full path to the copy number profile of each cell (or each sample, i.e. bulk data).
 
 Each **copy number profile** is a **tab-delimited** file reporting coordinates of genomic segments and their copy number status.<br/>
@@ -38,7 +38,7 @@ It has **4 columns** corresponding to chromosome, start position , end position 
 1	187128298	206257984	2
 ```
 
-### The genomic unit [`unit`]
+### [`unit`] The genomic unit 
 A **tab-delimited** file reporting coordinates of genomic segments (the genomic unit, i.e. genes).<br/>
 It has **3 columns** corresponding to chromosome, start position , end position. **No header**.
 
@@ -51,7 +51,7 @@ It has **3 columns** corresponding to chromosome, start position , end position.
 8	121052	121189
 ```
 
-### SNP with phasing information [`phased_snps`]
+### [`phased_snps`] SNPs with phasing information 
 A **VCF** file listing SNPs of interest annotated with phasing information specified as `0|1` or `1|0`.
 > Take a look at the standard [VCF](https://samtools.github.io/hts-specs/VCFv4.2.pdf) format for more details.
 
@@ -64,10 +64,10 @@ A **VCF** file listing SNPs of interest annotated with phasing information speci
 5	180712169	.	C	T	1463.6	.	AN=2;AC=1	GT	0|1
 ```
 
-### Output folder [`outdir`]
-The full-path to the folder where all outputs will be saved.
+### [`outdir`] Output folder 
+The full-path to the folder where outputs will be saved.
 
-### Number jobs to run in parallel [`mc.cores`] 
+### [`mc.cores`] Jobs in parallel
 The script can be run on multiple samples in parallel.
 Note:
 ```
