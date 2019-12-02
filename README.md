@@ -68,7 +68,7 @@ A **VCF** file listing SNPs of interest annotated with phasing information speci
 The full-path to the folder where outputs will be saved.
 
 ### [`mc.cores`] Jobs in parallel
-The script can be run on multiple samples in parallel.
+The script can be run on multiple samples in parallel.<br/>
 Note:
 ```
 mc.cores ≤ wc -l single_cells_cn
