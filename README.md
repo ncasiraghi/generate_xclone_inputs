@@ -15,9 +15,11 @@ module load bedops/2.4.14
 
 ## Inputs
 
+Usage example:
 ```R
-# Usage example
+
 Rscript get_xclone_input.R [single_cells_cn] [unit] [phased_snps] [outdir] [mc.cores]
+
 ```
 
 ### Copy number profiles of each cell (or sample) [`single_cells_cn`]
