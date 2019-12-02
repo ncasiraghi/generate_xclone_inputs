@@ -37,13 +37,23 @@ It has **4 columns** corresponding to chromosome, start position , end position 
 1	149815060	187128297	1
 1	187128298	206257984	2
 ```
+
 ### The genomic unit [`unit`]
 A **tab-delimited** file reporting coordinates of genomic segments (the genomic unit, i.e. genes).<br/>
 It has **3 columns** corresponding to chromosome, start position , end position. **No header**.
 
+*Example of **unit** file:*
+```
+8	109845	109929
+8	111804	112185
+8	116169	116644
+8	120571	120666
+8	121052	121189
+```
+
 ### SNP with phasing information [`phased_snps`]
 A **VCF** file listing SNPs of interest annotated with phasing information specified as `0|1` or `1|0`.
-> Take a look at the standard [VCF]((https://samtools.github.io/hts-specs/VCFv4.2.pdf)) format for more details.
+> Take a look at the standard [VCF](https://samtools.github.io/hts-specs/VCFv4.2.pdf) format for more details.
 
 *Example of **phased_snps** file:*
 ```
