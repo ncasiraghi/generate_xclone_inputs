@@ -1,6 +1,6 @@
 # Generate inputs for the XClone pipeline
 
-The R script `get_xclone_input.R` intersects (`intersectBed`) assign copy number status to a genomic unit defined by the user (i.e. Genes, Haplotype Blocks, ATAC peaks, custom bin). Each phased SNPs is then assigned to each genomic unit.<br/>
+The R script `get_xclone_input.R` assign copy number status to a genomic unit defined by the user (i.e. Genes, Haplotype Blocks, ATAC peaks, custom bin). Each phased SNPs is then assigned to each genomic unit.<br/>
 Each entry reported in the output corresponds to a SNP annotated with phasing information, coordiantes and copy number status of the genomic unit where it is located. 
 
 ## Requirements
