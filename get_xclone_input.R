@@ -200,6 +200,6 @@ if(unit=="NA"){
   }
   remove.files <- list.files(path = outdir,pattern = "step5_|step8_",full.names = TRUE)
   do.call(file.remove,list(remove.files))
-  file.remove(check.unit)
+  file.remove(checked.unit)
   message("done.")
 }
