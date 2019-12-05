@@ -101,7 +101,7 @@ if(unit=="NA"){
   message(paste("running in mode: Statistical Phasing & unit based on:",unit))
   
   format.unit  <- fread(unit,data.table = FALSE,select = 1:3)
-  checked.unit <- file.path(outdir,basename(unit))
+  checked.unit <- file.path(outdir,'unit.bed')
   write.table(format.unit,file = checked.unit,quote = FALSE,col.names = FALSE,row.names = FALSE,sep = '\t')
   
   GetAnnotedSNPs <- function(i,single_cells_cn,unit,phased_snps){
@@ -114,7 +114,9 @@ if(unit=="NA"){
     system(cmd)
     
     m <- fread(file = step4,sep = "\t",header = FALSE, stringsAsFactors = FALSE, data.table = FALSE,select = c(1:7))
-    m[,7] <- round(m[,7])
+    if(is.numeric(m[,7])){
+      m[,7] <- round(m[,7])
+    }
     m <- unite(m,col = UNIT,seq(1,3),sep = ":",remove=FALSE)
     
     unit_to_exclude <- c(which(duplicated(m$UNIT,fromLast = FALSE)),which(duplicated(m$UNIT,fromLast = TRUE)))
@@ -198,5 +200,6 @@ if(unit=="NA"){
   }
   remove.files <- list.files(path = outdir,pattern = "step5_|step8_",full.names = TRUE)
   do.call(file.remove,list(remove.files))
+  file.remove(check.unit)
   message("done.")
 }
