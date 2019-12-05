@@ -37,7 +37,7 @@ It has **4 columns** corresponding to chromosome, start position , end position 
 1	149815060	187128297	1
 1	187128298	206257984	2
 ```
-
+> The copy number status can be indicated as *total* (integer, i.e. `2`, `4`) or *absolute* (tuple, i.e. `0;2`, `2;2`, no specific format required) copy number.
 ### [`unit`] The genomic unit 
 A **tab-delimited** file reporting coordinates of genomic segments (the genomic unit, i.e. genes).<br/>
 It has **3 columns** corresponding to chromosome, start position , end position. **No header**.
