@@ -100,6 +100,10 @@ if(unit=="NA"){
   
   message(paste("running in mode: Statistical Phasing & unit based on:",unit))
   
+  format.unit  <- fread(unit,data.table = FALSE,select = 1:3)
+  checked.unit <- file.path(outdir,basename(unit))
+  write.table(format.unit,file = checked.unit,quote = FALSE,col.names = FALSE,row.names = FALSE,sep = '\t')
+  
   GetAnnotedSNPs <- function(i,single_cells_cn,unit,phased_snps){
     bed_file <- single_cells_cn[i]
     CELL_ID <- gsub(basename(bed_file),pattern = "\\.bed$",replacement = "")
@@ -153,7 +157,7 @@ if(unit=="NA"){
     
   }
   
-  mclapply(seq(single_cells_cn),GetAnnotedSNPs,single_cells_cn=single_cells_cn,unit=unit,phased_snps=phased_snps,mc.cores = mc.cores)
+  mclapply(seq(single_cells_cn),GetAnnotedSNPs,single_cells_cn=single_cells_cn,unit=checked.unit,phased_snps=phased_snps,mc.cores = mc.cores)
   
   # keep only units that are present in all cells
   ks <- list.files(path = file.path(outdir),pattern = 'step5_',full.names = TRUE)
