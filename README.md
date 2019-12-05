@@ -50,6 +50,7 @@ It has **3 columns** corresponding to chromosome, start position , end position.
 8	120571	120666
 8	121052	121189
 ```
+> The `unit` file can have more than 3 columns, however only the first 3 will be considered, all others will be ignored.    
 
 ### [`phased_snps`] SNPs with phasing information 
 A **VCF** file listing SNPs of interest annotated with phasing information specified as `0|1` or `1|0`.
