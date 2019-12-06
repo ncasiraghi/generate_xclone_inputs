@@ -4,7 +4,7 @@ library( Matrix )
 library( data.table )
 library( vioplot )
 
-cores <- 10
+cores <- 5
 
 ## [ functions ]
 
@@ -109,7 +109,7 @@ mclapply(seq(length(xci.files)),getDP,xci.files=xci.files,snps=snps,dp.mtx=dp.mt
 bed.dna <- list.files("/icgc/dkfzlsdf/analysis/B260/users/n790i/generate_xclone_inputs/studio/dna_unit_genes",pattern = "\\.bed$",full.names = T)
 bed.rna <- list.files("/icgc/dkfzlsdf/analysis/B260/users/n790i/generate_xclone_inputs/studio/rna_unit_genes",pattern = "\\.bed$",full.names = T)
 
-# SNPs with DP > th in DNA and RNA - cell annotated
+# SNPs with DP > th in DNA or RNA - cell annotated
 df.all.dna <- do.call(rbind,mclapply(seq(length(bed.dna)),DataFilter,minDP=1,bed=bed.dna,cn=NA,mc.cores = cores))
 df.all.rna <- do.call(rbind,mclapply(seq(length(bed.rna)),DataFilter,minDP=1,bed=bed.rna,cn=NA,mc.cores = cores))
 
@@ -204,28 +204,46 @@ getCountPerGene <- function(tab,cn=NA){
   sumDP <- function(df){
     return(sum(df$SNP_DP))
   }
-  
-  sumAD <- function(df){
-    return(sum(df$SNP_AD))
+
+  sum.maternal <- function(df){
+    mat.ad <- df$SNP_AD[which(df$SNP_PHASE_INFO == '1|0')]
+    pat.ad <- df$SNP_AD[which(df$SNP_PHASE_INFO == '0|1')]
+    pat.dp <- df$SNP_DP[which(df$SNP_PHASE_INFO == '0|1')]
+    return(sum(mat.ad,(pat.dp-pat.ad)))
   }
   
+  mat.reads <- unlist(lapply(out,FUN = sum.maternal))
   dp <- unlist(lapply(out,FUN = sumDP))
-  ad <- unlist(lapply(out,FUN = sumAD))
-  asr <- ad/dp
-  return(list(dp=dp,ad=ad,asr=asr))
+  asr <- mat.reads/dp
+  return(list(dp=dp,ad=mat.reads,asr=asr))
+  
 }
 
-genes.dna <- getCountPerGene(tab = df.all.dna,cn = 1)
-genes.rna <- getCountPerGene(tab = df.all.rna,cn = 1)
+png("studio/png/Plot5_cn2.png",width = 8,height = 4,units = 'in', res = 300)
 
-png("studio/png/Plot5a.png",width = 8,height = 4,units = 'in', res = 300)
+genes.dna <- getCountPerGene(tab = df.all.dna,cn = 2)
+genes.rna <- getCountPerGene(tab = df.all.rna,cn = 2)
 
 layout(matrix(c(1,2,3,3,
                 1,2,3,3),2,4,byrow = T))
 
 vioplot(genes.dna$dp,genes.rna$dp,names = c("scDNA", "scRNA"),pchMed = 20,ylab="DP per gene",col="white",rectCol = "white",colMed = "black",frame.plot = F)
 boxplot(genes.dna$dp,genes.rna$dp,outline = F,names = c("scDNA", "scRNA"),ylab="DP per gene",frame.plot=F,main='(no outliers)')
-vioplot(abs(0.5-(genes.dna$asr)),abs(0.5-(genes.rna$asr)),names = c("scDNA", "scRNA"),pchMed = 20,ylab="|0.5-(AD/DP)| per gene",col="white",rectCol = "white",colMed = "black",frame.plot = F,main='Genes in CN = 1')
+vioplot(abs(0.5-(genes.dna$asr)),abs(0.5-(genes.rna$asr)),names = c("scDNA", "scRNA"),ylim=c(0,0.5),pchMed = 20,ylab="|0.5-(AD/DP)| per gene",col="white",rectCol = "white",colMed = "black",frame.plot = F,main='Genes in CN = 2')
+
+dev.off()
+
+png("studio/png/Plot5_cn1.png",width = 8,height = 4,units = 'in', res = 300)
+
+genes.dna <- getCountPerGene(tab = df.all.dna,cn = 1)
+genes.rna <- getCountPerGene(tab = df.all.rna,cn = 1)
+
+layout(matrix(c(1,2,3,3,
+                1,2,3,3),2,4,byrow = T))
+
+vioplot(genes.dna$dp,genes.rna$dp,names = c("scDNA", "scRNA"),pchMed = 20,ylab="DP per gene",col="white",rectCol = "white",colMed = "black",frame.plot = F)
+boxplot(genes.dna$dp,genes.rna$dp,outline = F,names = c("scDNA", "scRNA"),ylab="DP per gene",frame.plot=F,main='(no outliers)')
+vioplot(abs(0.5-(genes.dna$asr)),abs(0.5-(genes.rna$asr)),names = c("scDNA", "scRNA"),ylim=c(0,0.5),pchMed = 20,ylab="|0.5-(AD/DP)| per gene",col="white",rectCol = "white",colMed = "black",frame.plot = F,main='Genes in CN = 1')
 
 dev.off()
 
