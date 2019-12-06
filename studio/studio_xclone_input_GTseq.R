@@ -4,7 +4,16 @@ library( Matrix )
 library( data.table )
 library( vioplot )
 
+setwd('/icgc/dkfzlsdf/analysis/B260/users/n790i/generate_xclone_inputs/studio/')
+
 cores <- 5
+## [ input ]
+
+GenomicUnit <- "/icgc/dkfzlsdf/analysis/B260/projects/chromothripsis_medulloblastoma/xclone_inputs/GTseq/STP-PDX/mode_SP/unit_genes/"
+
+omic <- "rna"
+#omic <- "dna"
+
 
 ## [ functions ]
 
@@ -39,12 +48,9 @@ plotres <- function(df,title){
 }
 
 # generate data 
-if(FALSE){
-  
-omic <- "rna"
+if(TRUE){
 
-# GenomicUnit <- "/icgc/dkfzlsdf/analysis/B260/projects/chromothripsis_medulloblastoma/xclone_inputs/GTseq/STP-PDX/mode_SP/unit_cn_blocks/"
-GenomicUnit <- "/icgc/dkfzlsdf/analysis/B260/projects/chromothripsis_medulloblastoma/xclone_inputs/GTseq/STP-PDX/mode_SP/unit_genes/"
+dir.create(paste(omic,basename(GenomicUnit),sep = '_'))
 
 ## GTseq - DNA
 if(omic=="dna"){
@@ -105,6 +111,8 @@ mclapply(seq(length(xci.files)),getDP,xci.files=xci.files,snps=snps,dp.mtx=dp.mt
 # SNP Analysis
 ##################################################
 
+dir.create('png')
+
 bed.dna <- list.files("/icgc/dkfzlsdf/analysis/B260/users/n790i/generate_xclone_inputs/studio/dna_unit_genes",pattern = "\\.bed$",full.names = T)
 bed.rna <- list.files("/icgc/dkfzlsdf/analysis/B260/users/n790i/generate_xclone_inputs/studio/rna_unit_genes",pattern = "\\.bed$",full.names = T)
 
@@ -121,7 +129,7 @@ m <- merge(data.frame(table(df.all.dna$CELL_ID),stringsAsFactors = F),
            by = "Var1",suffixes = c('_dna','_rna'))
 
 # Plot1 | n. of SNPs per cell in DNA and RNA
-png("studio/png/Plot1.png",width = 12,height = 4,units = 'in', res = 300)
+png("png/Plot1.png",width = 12,height = 4,units = 'in', res = 300)
 
 layout(matrix(c(1,1,1,3,3,
                 2,2,2,3,3),2,5,byrow = T))
@@ -133,7 +141,7 @@ vioplot(m$Freq_dna,m$Freq_rna,names = c("scDNA", "scRNA"),ylab="n. of SNPs per c
 dev.off()
 
 # Plot2 | DP of SNPs in DNA and RNA 
-png("studio/png/Plot2.png",width = 14,height = 7,units = 'in', res = 300)
+png("png/Plot2.png",width = 14,height = 7,units = 'in', res = 300)
 
 par(pty='s',mfrow=c(1,2))
 
@@ -146,7 +154,7 @@ dev.off()
 dfm <- merge(x = df.all.dna[,c(1,4,5,11:15)],df.all.rna[,c(1,4,5,11:15)],by = c('SNP','SNP_PHASE_INFO','CELL_ID','COPY_NUMBER',"UNIT"),all = FALSE,suffixes = c('_dna','_rna'))
 
 # Plot3 | SNPs with DP in both DNA and RNA per cell 
-png("studio/png/Plot3.png",width = 12,height = 6,units = 'in', res = 300)
+png("png/Plot3.png",width = 12,height = 6,units = 'in', res = 300)
 
 layout(matrix(c(1,1,1,1,2,2,
                 1,1,1,1,2,2,
@@ -161,7 +169,7 @@ vioplot(dfm$SNP_DP_dna,dfm$SNP_DP_rna,names = c("scDNA", "scRNA"),pchMed = 20,yl
 dev.off()
 
 # Plot4a | ASR absolute deviance from 0.5 for SNPs in copy number 2 segments
-png("studio/png/Plot4.png",width = 15,height = 7,units = 'in', res = 300)
+png("png/Plot4.png",width = 15,height = 7,units = 'in', res = 300)
 
 par(pty='s')
 
@@ -173,7 +181,7 @@ vioplot(abs(0.5-k.dna$SNP_ASR),abs(0.5-k.rna$SNP_ASR),names = c("scDNA", "scRNA"
 dev.off()
 
 # Plot4b | ASR absolute deviance from 0.5 for SNPs - considering only SNPs with DP in both DNA and RNA - in copy number 2 segments
-png("studio/png/Plot4_selected_snps.png",width = 9,height = 6,units = 'in', res = 300)
+png("png/Plot4_selected_snps.png",width = 9,height = 6,units = 'in', res = 300)
 
 layout(matrix(c(1,3,3,
                 2,3,3),2,3,byrow = T))
@@ -215,7 +223,7 @@ getCountPerGene <- function(tab,cn=NA){
   
 }
 
-png("studio/png/Plot5_cn2.png",width = 8,height = 4,units = 'in', res = 300)
+png("png/Plot5_cn2.png",width = 8,height = 4,units = 'in', res = 300)
 
 genes.dna <- getCountPerGene(tab = df.all.dna,cn = 2)
 genes.rna <- getCountPerGene(tab = df.all.rna,cn = 2)
@@ -229,7 +237,7 @@ vioplot(abs(0.5-(genes.dna$asr)),abs(0.5-(genes.rna$asr)),names = c("scDNA", "sc
 
 dev.off()
 
-png("studio/png/Plot5_cn1.png",width = 8,height = 4,units = 'in', res = 300)
+png("png/Plot5_cn1.png",width = 8,height = 4,units = 'in', res = 300)
 
 genes.dna <- getCountPerGene(tab = df.all.dna,cn = 1)
 genes.rna <- getCountPerGene(tab = df.all.rna,cn = 1)
@@ -271,7 +279,7 @@ for( u in unique(dfm$UNIT[which(dfm$COPY_NUMBER == 2 )]) ){
   r.ad <- c(r.ad, sum.maternal(df = dfm[which(dfm$UNIT == u),],omic = 'rna'))
 }
 
-png("studio/png/Plot6.png",width = 9,height = 7,units = 'in', res = 300)
+png("png/Plot6.png",width = 9,height = 7,units = 'in', res = 300)
 
 layout(matrix(c(1,3,3,
                 2,3,3),2,3,byrow = T))
@@ -284,7 +292,6 @@ dev.off()
 
 # Plot7 | Select genes that are diploid in 50% of cells and loss in the other 50%
 
-GenomicUnit <- "/icgc/dkfzlsdf/analysis/B260/projects/chromothripsis_medulloblastoma/xclone_inputs/GTseq/STP-PDX/mode_SP/unit_genes/"
 xci.files <- list.files(GenomicUnit,pattern = "xci_",full.names = TRUE)
 
 tab <- c()
@@ -310,7 +317,7 @@ cn2 <- rowSums(tab == 2)/ncol(tab)
 
 selected_genes <- intersect(which(cn1 > 0.4 & cn1 < 0.6),which(cn2 > 0.4 & cn2 < 0.6))
 
-png("studio/png/Plot7.png",width = 7,height = 7,units = 'in', res = 300)
+png("png/Plot7.png",width = 7,height = 7,units = 'in', res = 300)
 
 par(pty='s')
 
@@ -376,7 +383,7 @@ cate <- function(bed, selected_genes,minDP,filter_snps=FALSE,selected_snps=NA){
   
 }
 
-png("studio/png/Plot8.png",width = 7,height = 7,units = 'in', res = 300)
+png("png/Plot8.png",width = 7,height = 7,units = 'in', res = 300)
 
 gcn.dna <- cate(bed.dna,selected_genes,minDP = 1,filter_snps = FALSE,selected_snps = unique(dfm$SNP))
 gcn.rna <- cate(bed.rna,selected_genes,minDP = 1,filter_snps = FALSE,selected_snps = unique(dfm$SNP))
@@ -391,7 +398,7 @@ vioplot(abs(0.5-gcn.rna$ASR_cn1),abs(0.5-gcn.rna$ASR_cn2),names = c("CN = 1", "C
 
 dev.off()
 
-png("studio/png/Plot8_selected_snps.png",width = 7,height = 7,units = 'in', res = 300)
+png("png/Plot8_selected_snps.png",width = 7,height = 7,units = 'in', res = 300)
 
 gcn.dna <- cate(bed.dna,selected_genes,minDP = 1,filter_snps = TRUE,selected_snps = unique(dfm$SNP))
 gcn.rna <- cate(bed.rna,selected_genes,minDP = 1,filter_snps = TRUE,selected_snps = unique(dfm$SNP))
@@ -411,7 +418,7 @@ dev.off()
 genes.dna <- getCountPerGene(tab = df.all.dna[which( df.all.dna$GENE_CHROM == 3 & df.all.dna$GENE_START < 88000000),],cn=1)
 genes.rna <- getCountPerGene(tab = df.all.rna[which( df.all.rna$GENE_CHROM == 3 & df.all.rna$GENE_START < 88000000),],cn=1)
 
-png("studio/png/Plot9.png",width = 8,height = 4,units = 'in', res = 300)
+png("png/Plot9.png",width = 8,height = 4,units = 'in', res = 300)
 
 layout(matrix(c(1,2,3,3,
                 1,2,3,3),2,4,byrow = T))
