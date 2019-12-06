@@ -101,7 +101,6 @@ mclapply(seq(length(xci.files)),getDP,xci.files=xci.files,snps=snps,dp.mtx=dp.mt
 
 }
 
-
 ##################################################
 # SNP Analysis
 ##################################################
@@ -112,6 +111,9 @@ bed.rna <- list.files("/icgc/dkfzlsdf/analysis/B260/users/n790i/generate_xclone_
 # SNPs with DP > th in DNA or RNA - cell annotated
 df.all.dna <- do.call(rbind,mclapply(seq(length(bed.dna)),DataFilter,minDP=1,bed=bed.dna,cn=NA,mc.cores = cores))
 df.all.rna <- do.call(rbind,mclapply(seq(length(bed.rna)),DataFilter,minDP=1,bed=bed.rna,cn=NA,mc.cores = cores))
+
+df.all.dna <- unite(df.all.dna,col = UNIT,seq(5,7),sep = ":",remove=FALSE)
+df.all.rna <- unite(df.all.rna,col = UNIT,seq(5,7),sep = ":",remove=FALSE)
 
 # Number of SNPs with DP in DNA and RNA - per cell
 m <- merge(data.frame(table(df.all.dna$CELL_ID),stringsAsFactors = F),
@@ -141,8 +143,7 @@ vioplot(df.all.dna$SNP_DP,df.all.rna$SNP_DP,names = c("scDNA", "scRNA"),pchMed =
 dev.off()
 
 # SNPs with DP in both DNA and RNA - annotated per cell
-dfm <- merge(x = df.all.dna[,c(1,5:7,10:14)],df.all.rna[,c(1,5:7,10:14)],by = c('SNP','CELL_ID','COPY_NUMBER',"GENE_CHROM","GENE_START","GENE_END"),all = FALSE,suffixes = c('_dna','_rna'))
-dfm <- unite(dfm,col = UNIT,seq(4,6),sep = ":",remove=TRUE)
+dfm <- merge(x = df.all.dna[,c(1,4,5,11:15)],df.all.rna[,c(1,4,5,11:15)],by = c('SNP','SNP_PHASE_INFO','CELL_ID','COPY_NUMBER',"UNIT"),all = FALSE,suffixes = c('_dna','_rna'))
 
 # Plot3 | SNPs with DP in both DNA and RNA per cell 
 png("studio/png/Plot3.png",width = 12,height = 6,units = 'in', res = 300)
@@ -160,7 +161,7 @@ vioplot(dfm$SNP_DP_dna,dfm$SNP_DP_rna,names = c("scDNA", "scRNA"),pchMed = 20,yl
 dev.off()
 
 # Plot4a | ASR absolute deviance from 0.5 for SNPs in copy number 2 segments
-png("studio/png/Plot4a.png",width = 15,height = 7,units = 'in', res = 300)
+png("studio/png/Plot4.png",width = 15,height = 7,units = 'in', res = 300)
 
 par(pty='s')
 
@@ -172,7 +173,7 @@ vioplot(abs(0.5-k.dna$SNP_ASR),abs(0.5-k.rna$SNP_ASR),names = c("scDNA", "scRNA"
 dev.off()
 
 # Plot4b | ASR absolute deviance from 0.5 for SNPs - considering only SNPs with DP in both DNA and RNA - in copy number 2 segments
-png("studio/png/Plot4b.png",width = 9,height = 6,units = 'in', res = 300)
+png("studio/png/Plot4_selected_snps.png",width = 9,height = 6,units = 'in', res = 300)
 
 layout(matrix(c(1,3,3,
                 2,3,3),2,3,byrow = T))
@@ -180,18 +181,13 @@ layout(matrix(c(1,3,3,
 k <- dfm[which(dfm$COPY_NUMBER==2),]
 
 plot(k$SNP_DP_dna,k$SNP_DP_rna,pch=20,col='grey60',xlab='DP in DNA',ylab='DP in RNA',main=paste('n. SNPs = ',nrow(k),' in CN = 2'))
-
 plot(abs(0.5-k$SNP_ASR_dna),abs(0.5-k$SNP_ASR_rna),pch=20,col='grey60',xlab='|0.5-(AD/DP)| in DNA',ylab='|0.5-(AD/DP)| in RNA')
-
 vioplot(abs(0.5-k$SNP_ASR_dna),abs(0.5-k$SNP_ASR_rna),names = c("scDNA", "scRNA"),pchMed = 20,ylab="|0.5-(AD/DP)|",col="white",rectCol = "white",colMed = "black")
 
 dev.off()
 
-# Plot5a | ASR absolute deviance from 0.5 for GENEs in copy number 2 segments
+# Plot5_cn2 | ASR absolute deviance from 0.5 for GENEs in copy number 2 segments
 
-df.all.dna <- unite(df.all.dna,col = UNIT,seq(5,7),sep = ":",remove=FALSE)
-df.all.rna <- unite(df.all.rna,col = UNIT,seq(5,7),sep = ":",remove=FALSE)
- 
 getCountPerGene <- function(tab,cn=NA){
   
   if(!is.na(cn)){
@@ -248,34 +244,45 @@ vioplot(abs(0.5-(genes.dna$asr)),abs(0.5-(genes.rna$asr)),names = c("scDNA", "sc
 dev.off()
 
 
-# Plot5b | ASR absolute deviance from 0.5 per GENEs - considering only SNPs with DP in both DNA and RNA - in copy number 2 segments
+# Plot6 | ASR absolute deviance from 0.5 per GENEs - considering only SNPs with DP in both DNA and RNA - in copy number 2 segments
 d.dp <- c()
 d.ad <- c()
 r.dp <- c()
 r.ad <- c()
 
-for( u in unique(dfm$UNIT[which(dfm$COPY_NUMBER==2)]) ){
-  d.dp <- c(d.dp, sum(dfm$SNP_DP_dna[which(dfm$UNIT == u)]))
-  d.ad <- c(d.ad, sum(dfm$SNP_AD_dna[which(dfm$UNIT == u)]))
-  
-  r.dp <- c(r.dp, sum(dfm$SNP_DP_rna[which(dfm$UNIT == u)]))
-  r.ad <- c(r.ad, sum(dfm$SNP_AD_rna[which(dfm$UNIT == u)]))
+sum.maternal <- function(df,omic){
+  if(omic == 'dna'){
+    mat.ad <- df$SNP_AD_dna[which(df$SNP_PHASE_INFO == '1|0')]
+    pat.ad <- df$SNP_AD_dna[which(df$SNP_PHASE_INFO == '0|1')]
+    pat.dp <- df$SNP_DP_dna[which(df$SNP_PHASE_INFO == '0|1')]
+  }
+  if(omic == 'rna'){
+    mat.ad <- df$SNP_AD_rna[which(df$SNP_PHASE_INFO == '1|0')]
+    pat.ad <- df$SNP_AD_rna[which(df$SNP_PHASE_INFO == '0|1')]
+    pat.dp <- df$SNP_DP_rna[which(df$SNP_PHASE_INFO == '0|1')]
+  }
+  return(sum(mat.ad,(pat.dp-pat.ad)))
 }
 
-png("studio/png/Plot5b.png",width = 9,height = 7,units = 'in', res = 300)
+for( u in unique(dfm$UNIT[which(dfm$COPY_NUMBER == 2 )]) ){
+  d.dp <- c(d.dp, sum(dfm$SNP_DP_dna[which(dfm$UNIT == u)]))
+  d.ad <- c(d.ad, sum.maternal(df = dfm[which(dfm$UNIT == u),],omic = 'dna'))
+  r.dp <- c(r.dp, sum(dfm$SNP_DP_rna[which(dfm$UNIT == u)]))
+  r.ad <- c(r.ad, sum.maternal(df = dfm[which(dfm$UNIT == u),],omic = 'rna'))
+}
+
+png("studio/png/Plot6.png",width = 9,height = 7,units = 'in', res = 300)
 
 layout(matrix(c(1,3,3,
                 2,3,3),2,3,byrow = T))
 
 plot(d.dp,r.dp,pch=20,col='grey60',xlab='DP in DNA',ylab='DP in RNA',main=paste('n. genes = ',length(d.dp),' in CN = 2'))
-
 plot(abs(0.5-(d.ad/d.dp)),abs(0.5-(r.ad/r.dp)),pch=20,col='grey60',xlab='|0.5-(AD/DP)| in DNA',ylab='|0.5-(AD/DP)| in RNA')
-
 vioplot(abs(0.5-(d.ad/d.dp)),abs(0.5-(r.ad/r.dp)),names = c("scDNA", "scRNA"),pchMed = 20,ylab="|0.5-(AD/DP)|",col="white",rectCol = "white",colMed = "black")
 
 dev.off()
 
-# compute by genes
+# Plot7 | Select genes that are diploid in 50% of cells and loss in the other 50%
 
 GenomicUnit <- "/icgc/dkfzlsdf/analysis/B260/projects/chromothripsis_medulloblastoma/xclone_inputs/GTseq/STP-PDX/mode_SP/unit_genes/"
 xci.files <- list.files(GenomicUnit,pattern = "xci_",full.names = TRUE)
@@ -301,10 +308,9 @@ for(i in seq(length(xci.files))){
 cn1 <- rowSums(tab == 1)/ncol(tab)
 cn2 <- rowSums(tab == 2)/ncol(tab)
 
-
 selected_genes <- intersect(which(cn1 > 0.4 & cn1 < 0.6),which(cn2 > 0.4 & cn2 < 0.6))
 
-png("studio/png/Plot6.png",width = 7,height = 7,units = 'in', res = 300)
+png("studio/png/Plot7.png",width = 7,height = 7,units = 'in', res = 300)
 
 par(pty='s')
 
@@ -319,6 +325,14 @@ abline(h = c(0.4,0.6),v = c(0.4,0.6),lwd=0.4)
 
 dev.off()
 
+# Plot8 | plot ASR in genes that have cn=1 and cn=2 in about 50% of cells
+
+sum.maternal <- function(df){
+  mat.ad <- df$SNP_AD[which(df$SNP_PHASE_INFO == '1|0')]
+  pat.ad <- df$SNP_AD[which(df$SNP_PHASE_INFO == '0|1')]
+  pat.dp <- df$SNP_DP[which(df$SNP_PHASE_INFO == '0|1')]
+  return(sum(mat.ad,(pat.dp-pat.ad)))
+}
 
 cate <- function(bed, selected_genes,minDP,filter_snps=FALSE,selected_snps=NA){
   
@@ -343,7 +357,7 @@ cate <- function(bed, selected_genes,minDP,filter_snps=FALSE,selected_snps=NA){
                              SNPS=nrow(g),
                              CELLS=length(unique(g$CELL_ID)),
                              DP=sum(g$SNP_DP),
-                             AD=sum(g$SNP_AD),
+                             AD=sum.maternal(g),
                              ASR=sum(g$SNP_AD)/sum(g$SNP_DP),stringsAsFactors = F)
           return(this)
         } else {
@@ -362,10 +376,10 @@ cate <- function(bed, selected_genes,minDP,filter_snps=FALSE,selected_snps=NA){
   
 }
 
-gcn.dna <- cate(bed.dna,selected_genes,minDP = 10,filter_snps = FALSE,selected_snps = unique(dfm$SNP))
-gcn.rna <- cate(bed.rna,selected_genes,minDP = 10,filter_snps = FALSE,selected_snps = unique(dfm$SNP))
+png("studio/png/Plot8.png",width = 7,height = 7,units = 'in', res = 300)
 
-png("studio/png/Plot7.png",width = 7,height = 7,units = 'in', res = 300)
+gcn.dna <- cate(bed.dna,selected_genes,minDP = 1,filter_snps = FALSE,selected_snps = unique(dfm$SNP))
+gcn.rna <- cate(bed.rna,selected_genes,minDP = 1,filter_snps = FALSE,selected_snps = unique(dfm$SNP))
 
 par(pty="s",mfrow=c(2,2))
 
@@ -377,12 +391,27 @@ vioplot(abs(0.5-gcn.rna$ASR_cn1),abs(0.5-gcn.rna$ASR_cn2),names = c("CN = 1", "C
 
 dev.off()
 
-# check for allelic imbalance on chromosome 3p 
+png("studio/png/Plot8_selected_snps.png",width = 7,height = 7,units = 'in', res = 300)
+
+gcn.dna <- cate(bed.dna,selected_genes,minDP = 1,filter_snps = TRUE,selected_snps = unique(dfm$SNP))
+gcn.rna <- cate(bed.rna,selected_genes,minDP = 1,filter_snps = TRUE,selected_snps = unique(dfm$SNP))
+
+par(pty="s",mfrow=c(2,2))
+
+plot(abs(0.5-gcn.dna$ASR_cn1),abs(0.5-gcn.dna$ASR_cn2),xlab="abs(0.5-ASR) in CN=1",ylab="abs(0.5-ASR) in CN=2",xlim=c(0,0.5),ylim=c(0,0.5),main='DNA')
+vioplot(abs(0.5-gcn.dna$ASR_cn1),abs(0.5-gcn.dna$ASR_cn2),names = c("CN = 1", "CN = 2"),ylab="abs(0.5-ASR)",col="white",rectCol = "white",colMed = "black",pchMed = 20,main='DNA')
+
+plot(abs(0.5-gcn.rna$ASR_cn1),abs(0.5-gcn.rna$ASR_cn2),xlab="abs(0.5-ASR) in CN=1",ylab="abs(0.5-ASR) in CN=2",xlim=c(0,0.5),ylim=c(0,0.5),main='RNA')
+vioplot(abs(0.5-gcn.rna$ASR_cn1),abs(0.5-gcn.rna$ASR_cn2),names = c("CN = 1", "CN = 2"),ylab="abs(0.5-ASR)",col="white",rectCol = "white",colMed = "black",pchMed = 20,main='RNA')
+
+dev.off()
+
+# Plot9 | check for allelic imbalance on chromosome 3p 
 
 genes.dna <- getCountPerGene(tab = df.all.dna[which( df.all.dna$GENE_CHROM == 3 & df.all.dna$GENE_START < 88000000),],cn=1)
 genes.rna <- getCountPerGene(tab = df.all.rna[which( df.all.rna$GENE_CHROM == 3 & df.all.rna$GENE_START < 88000000),],cn=1)
 
-png("studio/png/Plot8.png",width = 8,height = 4,units = 'in', res = 300)
+png("studio/png/Plot9.png",width = 8,height = 4,units = 'in', res = 300)
 
 layout(matrix(c(1,2,3,3,
                 1,2,3,3),2,4,byrow = T))
@@ -392,5 +421,3 @@ boxplot(genes.dna$dp,genes.rna$dp,outline = F,names = c("scDNA", "scRNA"),ylab="
 vioplot(abs(0.5-(genes.dna$asr)),abs(0.5-(genes.rna$asr)),names = c("scDNA", "scRNA"),pchMed = 20,ylab="|0.5-(AD/DP)| per gene",col="white",rectCol = "white",colMed = "black",frame.plot = F,main='Genes in 3p')
 
 dev.off()
-
-
